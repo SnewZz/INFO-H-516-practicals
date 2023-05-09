@@ -68,7 +68,7 @@ def encode(path, quality):
     inv_img = Image.fromarray(inv_img_np)
 
     # Enregistrer l'image
-    inv_img.save('img/dct_bird.tga')
+    inv_img.save('data/result/dct_bird.tga')
 
     # Recombiner les blocs en une seule image
     inv_img_np = np.zeros_like(img_np)
@@ -80,4 +80,4 @@ def encode(path, quality):
     inv_img = Image.fromarray(inv_img_np)
 
     # Enregistrer l'image
-    inv_img.save('img/inverse_bird.tga')
+    inv_img.save('data/result/inverse_bird.tga')
