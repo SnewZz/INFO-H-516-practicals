@@ -12,8 +12,9 @@ class Image:
         self.blocks = self.get_blocks()
 
     def get_image_info(self):
-        img = I.open(self.path)
+
         img = cv2.imread(self.path, cv2.IMREAD_UNCHANGED)
+        print(img.dtype)
 
         if len(img.shape) == 2:
             height, width = img.shape
@@ -31,46 +32,93 @@ class Image:
         # Reshape the data of the image into blocks
         num_blocks_h = self.height // BLOCK_SIZE
         num_blocks_w = self.width // BLOCK_SIZE
-        if len(img.shape) == 2:
-            block_data = np.reshape(img[:num_blocks_h*BLOCK_SIZE, :num_blocks_w*BLOCK_SIZE], (num_blocks_h, num_blocks_w, BLOCK_SIZE, BLOCK_SIZE, self.channel_count))
-        else :
-            block_data = np.reshape(img[:num_blocks_h*BLOCK_SIZE, :num_blocks_w*BLOCK_SIZE, :], (num_blocks_h, num_blocks_w, BLOCK_SIZE, BLOCK_SIZE, self.channel_count))
 
-         #convert into float to avoid lost of precision in the calculation with DCT
-        block_data = block_data.astype(np.float32)
+        img_np = img[:num_blocks_h*BLOCK_SIZE, :num_blocks_w*BLOCK_SIZE]
 
-        blocks = []
+        blocks = np.split(img_np, num_blocks_h, axis=0)
+        blocks = [np.split(block, num_blocks_w, axis=1) for block in blocks]
+        blocks = np.array(blocks).reshape(-1, BLOCK_SIZE, BLOCK_SIZE, self.channel_count)[:num_blocks_h*num_blocks_w]
+
+        block_array = []
         for i in range(num_blocks_h):
-            row_blocks = []
+            row = []
             for j in range(num_blocks_w):
-                block = Block(block_data[i, j])
-                row_blocks.append(block)
-            blocks.append(row_blocks)
+                # Create a Block object for this block
+                block_data = blocks[i*num_blocks_w+j]
+                block = Block(block_data)
+                row.append(block)
+            block_array.append(row)
 
-        return blocks
+        # blocks_list = []
+        # for block in blocks:
+        #     blocks_list.append(Block(block))
+        #print(len(blocks_list))
+        #===========================================
+            
+        # if len(img.shape) == 2:
+        #     block_data = np.reshape(img[:num_blocks_h*BLOCK_SIZE, :num_blocks_w*BLOCK_SIZE], (num_blocks_h, num_blocks_w, BLOCK_SIZE, BLOCK_SIZE, self.channel_count))
+        # else :
+        #     block_data = np.reshape(img[:num_blocks_h*BLOCK_SIZE, :num_blocks_w*BLOCK_SIZE, :], (num_blocks_h, num_blocks_w, BLOCK_SIZE, BLOCK_SIZE, self.channel_count))
+
+        #  #convert into float to avoid lost of precision in the calculation with DCT
+        # block_data = block_data.astype(np.float32)
+
+        # blocks = []
+        #for i in range(num_blocks_h):
+        #    row_blocks = []
+        #    for j in range(num_blocks_w):
+        #        block = Block(block_data[i, j])
+        #        row_blocks.append(block)
+        #    blocks.append(row_blocks)
+
+        return block_array
         
     def encode(self):
+
+        quantization_matrix = np.array([[16, 11, 10, 16, 24, 40, 51, 61],
+                               [12, 12, 14, 19, 26, 58, 60, 55],
+                               [14, 13, 16, 24, 40, 57, 69, 56],
+                               [14, 17, 22, 29, 51, 87, 80, 62],
+                               [18, 22, 37, 56, 68, 109, 103, 77],
+                               [24, 35, 55, 64, 81, 104, 113, 92],
+                               [49, 64, 78, 87, 103, 121, 120, 101],
+                               [72, 92, 95, 98, 112, 100, 103, 99]])
 
         for row_blocks in self.blocks:
             for block in row_blocks:
                 block.dct()
+                block.quantize(quantization_matrix)
 
     def decode(self):
+
+        quantization_matrix = np.array([[16, 11, 10, 16, 24, 40, 51, 61],
+                               [12, 12, 14, 19, 26, 58, 60, 55],
+                               [14, 13, 16, 24, 40, 57, 69, 56],
+                               [14, 17, 22, 29, 51, 87, 80, 62],
+                               [18, 22, 37, 56, 68, 109, 103, 77],
+                               [24, 35, 55, 64, 81, 104, 113, 92],
+                               [49, 64, 78, 87, 103, 121, 120, 101],
+                               [72, 92, 95, 98, 112, 100, 103, 99]])
 
         for row_blocks in self.blocks:
             for block in row_blocks:
                 block.idct()
+                block.dequantize(quantization_matrix)
 
     def save_image(self, file_path):
-        # Combine the blocks back into an array
-        block_data = np.zeros((self.height, self.width, self.channel_count), dtype=np.float32)
-        for i, row_blocks in enumerate(self.blocks):
-            for j, block in enumerate(row_blocks):
-                x_start, y_start = j * BLOCK_SIZE, i * BLOCK_SIZE
-                block_data[y_start:y_start+BLOCK_SIZE, x_start:x_start+BLOCK_SIZE, :] = block.data
 
-        # Convert the array to an unsigned 8-bit integer array
-        image_data = np.clip(block_data, 0, 255).astype(np.uint8)
+        num_blocks_h = self.height // BLOCK_SIZE
+        num_blocks_w = self.width // BLOCK_SIZE
 
-        # Save the image using the PIL Image module
-        cv2.imwrite(file_path, image_data)
+        reconstructed = np.zeros((self.height, self.width), dtype=np.uint8)
+
+        for i in range(num_blocks_h):
+            for j in range(num_blocks_w):
+                block = self.blocks[i][j]
+                y, x = i*BLOCK_SIZE, j*BLOCK_SIZE
+                reconstructed[y:y+BLOCK_SIZE, x:x+BLOCK_SIZE] = block.get_data().squeeze().astype(np.uint8)
+
+        # Save the image to file
+        img = I.fromarray(reconstructed)
+        img.save(file_path)
+
