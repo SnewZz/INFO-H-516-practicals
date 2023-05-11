@@ -14,7 +14,6 @@ class Image:
     def get_image_info(self):
 
         img = cv2.imread(self.path, cv2.IMREAD_UNCHANGED)
-        print(img.dtype)
 
         if len(img.shape) == 2:
             height, width = img.shape
@@ -49,48 +48,23 @@ class Image:
                 row.append(block)
             block_array.append(row)
 
-        # blocks_list = []
-        # for block in blocks:
-        #     blocks_list.append(Block(block))
-        #print(len(blocks_list))
-        #===========================================
-            
-        # if len(img.shape) == 2:
-        #     block_data = np.reshape(img[:num_blocks_h*BLOCK_SIZE, :num_blocks_w*BLOCK_SIZE], (num_blocks_h, num_blocks_w, BLOCK_SIZE, BLOCK_SIZE, self.channel_count))
-        # else :
-        #     block_data = np.reshape(img[:num_blocks_h*BLOCK_SIZE, :num_blocks_w*BLOCK_SIZE, :], (num_blocks_h, num_blocks_w, BLOCK_SIZE, BLOCK_SIZE, self.channel_count))
-
-        #  #convert into float to avoid lost of precision in the calculation with DCT
-        # block_data = block_data.astype(np.float32)
-
-        # blocks = []
-        #for i in range(num_blocks_h):
-        #    row_blocks = []
-        #    for j in range(num_blocks_w):
-        #        block = Block(block_data[i, j])
-        #        row_blocks.append(block)
-        #    blocks.append(row_blocks)
-
         return block_array
         
     def encode(self):
         print("Compression of the image...")
 
-        # for row_blocks in self.blocks:
-            # for block in row_blocks:
-                # block.dct()
         for row_blocks in self.blocks:
             for block in row_blocks:
                 block.convert_to("double")
                 block.dct()
-                #block.quantize()
+                block.quantize()
 
     def decode(self):
         print("Decompression of the image...")
 
         for row_blocks in self.blocks:
             for block in row_blocks:
-                #block.dequantize()
+                block.dequantize()
                 block.idct()
                 block.convert_to("uint8")
 
