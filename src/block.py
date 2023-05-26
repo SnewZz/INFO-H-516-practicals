@@ -11,18 +11,20 @@ QUANTIZATION_MATRIX = np.array([[16, 11, 10, 16, 24, 40, 51, 61],
                                [49, 64, 78, 87, 103, 121, 120, 101],
                                [72, 92, 95, 98, 112, 100, 103, 99]])
 
-class Block:
+class MyBlock:
     def __init__(self, data):
         self.data = data
 
     def dct(self):
-        self.data = dct(dct(self.data.T, norm='ortho').T, norm='ortho')
-    
+        # self.data = dct(dct(self.data.T, norm='ortho').T, norm='ortho')
+        self.data = cv2.dct(self.data)
+
     def quantize(self):
         self.data = np.divide(self.data, QUANTIZATION_MATRIX).astype(int)
 
     def idct(self):
-        self.data = idct(idct(self.data.T, norm='ortho').T, norm='ortho')
+        # self.data = idct(idct(self.data.T, norm='ortho').T, norm='ortho')
+        self.data = cv2.idct(self.data)
 
     def dequantize(self):
         self.data = np.multiply(self.data, QUANTIZATION_MATRIX)
