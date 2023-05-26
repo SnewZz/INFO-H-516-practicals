@@ -3,6 +3,23 @@ import numpy as np
 
 BLOCK_SIZE = 8
 
+def convert_to(data, dtype, scale=1.0):
+        data = cv2.convertScaleAbs(data, alpha=scale, beta=0.0)
+
+        if dtype == "float":
+            data.astype(np.float32)
+        elif dtype == "double":
+            data.astype(np.float64)
+        elif dtype == "int":
+            data.astype(np.int32)
+        elif dtype == "uint8":
+            data.astype(np.uint8)
+        elif dtype == "uint16":
+            data.astype(np.uint16)
+        else:
+            raise ValueError(f"Invalid data type: {dtype}")
+        
+
 # Fonction pour appliquer la DCT par bloc de 8x8
 def apply_dct(image):
     result = np.zeros_like(image, dtype=np.float32)
@@ -12,7 +29,7 @@ def apply_dct(image):
         for j in range(0, image.shape[1], BLOCK_SIZE):
             # Extraction du bloc de 8x8
             block = image[i:i+BLOCK_SIZE, j:j+BLOCK_SIZE]
-
+            # block = convert_to(block, "double")
             # Application de la DCT sur chaque canal de couleur
             dct_block = np.zeros_like(block, dtype=np.float32)
             for k in range(block.shape[2]):
@@ -44,7 +61,7 @@ def apply_idct(result):
     return image
 
 # Chargement de l'image TIFF en couleur
-image = cv2.imread("src/data/lena3.tif", cv2.IMREAD_COLOR)
+image = cv2.imread("src/data/bird.tif", cv2.IMREAD_COLOR)
 
 # Application de la DCT
 dct_result = apply_dct(image)
