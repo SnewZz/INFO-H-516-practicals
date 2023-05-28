@@ -52,6 +52,6 @@ cv2.imshow("Original Image", image)
 for i, img in enumerate(new_images):
     cv2.imshow("Reconstructed Image "+str(i), img)
 print(psnr_result)
-utils.plot_psnr_result(psnr_result)
+utils.plot_psnr_result(psnr_result, "Bird (in grey scale)")
 cv2.waitKey(0)
 cv2.destroyAllWindows()

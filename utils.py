@@ -41,70 +41,71 @@ BAD_QUANTIZATION_MATRIX = np.array([[128, 192, 160, 128, 192, 160, 128, 192],
 
 MATRIX_MODE = [LOW_QUANTIZATION_MATRIX, QUANTIZATION_MATRIX, HIGH_QUANTIZATION_MATRIX, BAD_QUANTIZATION_MATRIX]
 
-# Fonction pour appliquer la DCT par bloc de 8x8
+# Function for applying DCT and quantization in blocks of 8x8
 def encode(image, BLOCK_SIZE, mode):
-    #determine if the image is colored or not
+    # Determine if the image is colored or not
     is_colored = not len(image.shape) == 2
+    
     result = np.zeros_like(image, dtype=np.float32)
 
-    # Parcours des blocs de 8x8
+    # Loop on image with BLOCK_SIZE*BLOCK_SIZE blocks
     for i in range(0, image.shape[0], BLOCK_SIZE):
         for j in range(0, image.shape[1], BLOCK_SIZE):
-            # Extraction du bloc de 8x8
+            # Extract of a block
             if is_colored:
                 block = image[i:i+BLOCK_SIZE, j:j+BLOCK_SIZE, :]
             else:
                 block = image[i:i+BLOCK_SIZE, j:j+BLOCK_SIZE]
 
-            # Application de la DCT sur chaque canal de couleur
+            # Apply of DCT and quantization on the block
             dct_block = np.zeros_like(block, dtype=np.float32)
+
+            # If colored picture, loop on each channel
             if is_colored:
                 for k in range(block.shape[2]):
-                    dct_block[:, :, k] = cv2.dct(block[:, :, k].astype(np.float32))
-                    # Application de la quantization
-                    # dct_block[:, :, k] = np.divide(dct_block[:, :, k], QUANTIZATION_MATRIX)
 
+                    dct_block[:, :, k] = cv2.dct(block[:, :, k].astype(np.float32))
                     dct_block[:, :, k] = np.round(dct_block[:, :, k] / MATRIX_MODE[mode]) * MATRIX_MODE[mode]
-                # Stockage du résultat
+                    
                 result[i:i+BLOCK_SIZE, j:j+BLOCK_SIZE, :] = dct_block
             else:
                 dct_block = cv2.dct(block.astype(np.float32))
                 dct_block = np.round(dct_block / MATRIX_MODE[mode]) * MATRIX_MODE[mode]
-                # Stockage du résultat
-                result[i:i+BLOCK_SIZE, j:j+BLOCK_SIZE] = dct_block
 
+                result[i:i+BLOCK_SIZE, j:j+BLOCK_SIZE] = dct_block
             
     return result
 
-# Fonction pour appliquer l'IDCT par bloc de 8x8
+# Function for applying dequantization and then IDCT in blocks of 8x8
 def decode(result, BLOCK_SIZE, mode):
-    #determine if the image is colored or not
+
+    # Determine if the image is colored or not
     is_colored = not len(result.shape) == 2
     image = np.zeros_like(result, dtype=np.float32)
 
-    # Parcours des blocs de 8x8
+    # Loop on image with BLOCK_SIZE*BLOCK_SIZE blocks
     for i in range(0, result.shape[0], BLOCK_SIZE):
         for j in range(0, result.shape[1], BLOCK_SIZE):
-
+            # Extract of a block
             if is_colored:
-                # Extraction du bloc de 8x8
                 dct_block = result[i:i+BLOCK_SIZE, j:j+BLOCK_SIZE, :]
             
             else:
                 dct_block = result[i:i+BLOCK_SIZE, j:j+BLOCK_SIZE]
                 
 
-            # Application de l'IDCT sur chaque canal de couleur
+            # Apply of dequantization and IDCT on the block
             block = np.zeros_like(dct_block, dtype=np.float32)
+
+            # If colored picture, loop on each channel
             if is_colored:
                 for k in range(dct_block.shape[2]):
                     block[:, :, k] = dct_block[:, :, k] * MATRIX_MODE[mode]
                     block[:, :, k] = cv2.idct(dct_block[:, :, k].astype(np.float32))
 
-                # Conversion des valeurs de block en uint8
+                # To keep value between 0 and 255 for each pixel
                 block = np.clip(block, 0, 255)
 
-                # Stockage du résultat
                 image[i:i+BLOCK_SIZE, j:j+BLOCK_SIZE, :] = block
 
             else:
@@ -112,20 +113,25 @@ def decode(result, BLOCK_SIZE, mode):
                 block = dct_block * MATRIX_MODE[mode]
                 block = cv2.idct(dct_block.astype(np.float32))
 
-                # Conversion des valeurs de block en uint8
+                # To keep value between 0 and 255 for each pixel
                 block = np.clip(block, 0, 255)
 
-                # Stockage du résultat
                 image[i:i+BLOCK_SIZE, j:j+BLOCK_SIZE] = block
 
     return image
 
-def plot_psnr_result(psnr_values):
-    # Matrices de quantification correspondantes
-    quantization_matrices = ["low matrix", "medium matrix", "high matrix"]
 
-    plt.plot(quantization_matrices, psnr_values, marker='o', label="Bird (in grey scale)")
-    plt.plot(quantization_matrices, [36.26821166418092, 34.47315618805436, 32.69025601892846], marker='o', label="Lena3 (in color)")
+# Function to plot the psnr result
+def plot_psnr_result(psnr_values, label_name):
+
+    if len(psnr_values) == 3:
+        # Correspondent quantization matrix
+        quantization_matrices = ["low matrix", "medium matrix", "high matrix"]
+    else:
+        quantization_matrices = ["low matrix", "medium matrix", "high matrix", "bad matrix"]
+
+    plt.plot(quantization_matrices, psnr_values, marker='o', label=label_name)
+    # plt.plot(quantization_matrices, [36.26821166418092, 34.47315618805436, 32.69025601892846], marker='o', label="Lena3 (in color)")
 
     plt.xlabel('Quantization Matrix')
     plt.ylabel('PSNR Value')
