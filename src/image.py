@@ -12,7 +12,7 @@ class MyImage:
     def __init__(self, path):
         current_dir = os.path.dirname(os.path.abspath(__file__))
         self.path = os.path.join(current_dir, path)
-        self.width, self.height, self.channel_bits, self.channel_count = self.get_image_info()
+        self.width, self.height, self.channel_count = self.get_image_info()
         self.blocks = self.get_blocks()
 
     def get_image_info(self):
@@ -23,9 +23,8 @@ class MyImage:
             channel_count = 1  #grayscale image
         else:
             height, width, channel_count = img.shape
-        channel_bits = img.dtype.itemsize * 8
 
-        return height, width, channel_bits, channel_count
+        return height, width, channel_count
 
     def get_blocks(self):
 
@@ -40,6 +39,7 @@ class MyImage:
         blocks = np.split(img_np, num_blocks_h, axis=0)
         blocks = [np.split(block, num_blocks_w, axis=1) for block in blocks]
         if(self.channel_count == 1):
+            print(blocks.shape)
             blocks = np.array(blocks).reshape(-1, BLOCK_SIZE, BLOCK_SIZE)[:num_blocks_h*num_blocks_w]
         else:
             blocks = np.array(blocks).reshape(-1, BLOCK_SIZE, BLOCK_SIZE, self.channel_count)[:num_blocks_h*num_blocks_w]
