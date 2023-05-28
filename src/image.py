@@ -27,72 +27,55 @@ class MyImage:
         return height, width, channel_count
 
     def get_blocks(self):
-
+        blocks = []
         img = cv2.imread(self.path, cv2.IMREAD_UNCHANGED)
-
-        # Reshape the data of the image into blocks
-        num_blocks_h = self.height // BLOCK_SIZE
-        num_blocks_w = self.width // BLOCK_SIZE
-
-        img_np = img[:num_blocks_h*BLOCK_SIZE, :num_blocks_w*BLOCK_SIZE]
-
-        blocks = np.split(img_np, num_blocks_h, axis=0)
-        blocks = [np.split(block, num_blocks_w, axis=1) for block in blocks]
-        if(self.channel_count == 1):
-            print(blocks.shape)
-            blocks = np.array(blocks).reshape(-1, BLOCK_SIZE, BLOCK_SIZE)[:num_blocks_h*num_blocks_w]
-        else:
-            blocks = np.array(blocks).reshape(-1, BLOCK_SIZE, BLOCK_SIZE, self.channel_count)[:num_blocks_h*num_blocks_w]
-        block_array = []
-        for i in range(num_blocks_h):
-            row = []
-            for j in range(num_blocks_w):
-                # Create a Block object for this block
-                block_data = blocks[i*num_blocks_w+j]
-                block = MyBlock(block_data)
-                row.append(block)
-            block_array.append(row)
-
-        return block_array
+        img_float32 = img.astype(np.float32)
+        for i in range(0, img_float32.shape[0], BLOCK_SIZE):
+            for j in range(0, img_float32.shape[1], BLOCK_SIZE):
+                if(self.channel_count == 1):
+                    blocks.append(MyBlock(img_float32[i:i+BLOCK_SIZE, j:j+BLOCK_SIZE]))
+                else:
+                    blocks.append(MyBlock(img_float32[i:i+BLOCK_SIZE, j:j+BLOCK_SIZE, :]))
+        return blocks
         
     def encode(self):
         print("Compression of the image...")
-        print(self.blocks[0][0].get_data().shape)
-        for row_blocks in self.blocks:
-            for block in row_blocks:
-                block.convert_to("double")
-                block.dct()
-                # block.quantize()
-        print(self.blocks[0][0].get_data().shape)
+        for block in self.blocks:
+            block.dct()
+            block.quantize()
 
     def decode(self):
         print("Decompression of the image...")
+        for block in self.blocks:
+            block.dequantize()
+            block.idct()
 
-        for row_blocks in self.blocks:
-            for block in row_blocks:
-                block.convert_to("double")
-                # block.dequantize()
-                block.idct()
 
-    def save_image(self, file_path):
-
+    def merge_blocks(self, file_path):
         num_blocks_h = self.height // BLOCK_SIZE
         num_blocks_w = self.width // BLOCK_SIZE
+        # Créer une image vide pour stocker l'image reconstruite
+        if self.channel_count == 1 :
+            reconstructed = np.zeros((self.height, self.width), dtype=np.uint8)
+        else :
+            reconstructed = np.zeros((self.height, self.width, self.channel_count), dtype=np.uint8)
 
-        reconstructed = np.zeros((self.height, self.width), dtype=np.uint8)
-
+        # Parcourir tous les blocs
         for i in range(num_blocks_h):
             for j in range(num_blocks_w):
-                block = self.blocks[i][j]
-                y, x = i*BLOCK_SIZE, j*BLOCK_SIZE
-                reconstructed[y:y+BLOCK_SIZE, x:x+BLOCK_SIZE] = block.get_data()
-                # if(self.channel_count == 1):
-                    # reconstructed[y:y+BLOCK_SIZE, x:x+BLOCK_SIZE] = block.get_data()
-                # else:
-                    # reconstructed[y:y+BLOCK_SIZE, x:x+BLOCK_SIZE] = block.get_data()
+                block = self.blocks[i * num_blocks_w + j]
 
-        # Save the image to file
+                # Calculer les coordonnées du bloc dans l'image reconstruite
+                y, x = i * BLOCK_SIZE, j * BLOCK_SIZE
+
+                # Copier les données du bloc dans l'image reconstruite
+                if self.channel_count == 1:
+                    reconstructed[y:y + BLOCK_SIZE, x:x + BLOCK_SIZE] = block.get_data()
+                else:
+                    reconstructed[y:y + BLOCK_SIZE, x:x + BLOCK_SIZE, :] = block.get_data()
+
         img = I.fromarray(reconstructed)
         current_dir = os.path.dirname(os.path.abspath(__file__))
         img.save(os.path.join(current_dir,file_path))
+        return reconstructed
 
