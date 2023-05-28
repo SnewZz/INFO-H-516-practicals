@@ -29,10 +29,22 @@ HIGH_QUANTIZATION_MATRIX = np.array([[32, 24, 22, 32, 48, 80, 102, 122],
                                      [98, 128, 156, 174, 206, 242, 240, 202],
                                      [144, 184, 190, 196, 224, 200, 206, 198]])
 
-MATRIX_MODE = [LOW_QUANTIZATION_MATRIX, QUANTIZATION_MATRIX, HIGH_QUANTIZATION_MATRIX]
+BAD_QUANTIZATION_MATRIX = np.array([[128, 192, 160, 128, 192, 160, 128, 192],
+                                   [192, 160, 128, 192, 160, 128, 192, 160],
+                                   [160, 128, 192, 160, 128, 192, 160, 128],
+                                   [128, 192, 160, 128, 192, 160, 128, 192],
+                                   [192, 160, 128, 192, 160, 128, 192, 160],
+                                   [160, 128, 192, 160, 128, 192, 160, 128],
+                                   [128, 192, 160, 128, 192, 160, 128, 192],
+                                   [192, 160, 128, 192, 160, 128, 192, 160]])
+
+
+MATRIX_MODE = [LOW_QUANTIZATION_MATRIX, QUANTIZATION_MATRIX, HIGH_QUANTIZATION_MATRIX, BAD_QUANTIZATION_MATRIX]
 
 # Fonction pour appliquer la DCT par bloc de 8x8
-def encode(image, BLOCK_SIZE, is_colored, mode):
+def encode(image, BLOCK_SIZE, mode):
+    #determine if the image is colored or not
+    is_colored = not len(image.shape) == 2
     result = np.zeros_like(image, dtype=np.float32)
 
     # Parcours des blocs de 8x8
@@ -65,7 +77,9 @@ def encode(image, BLOCK_SIZE, is_colored, mode):
     return result
 
 # Fonction pour appliquer l'IDCT par bloc de 8x8
-def decode(result, BLOCK_SIZE, is_colored, mode):
+def decode(result, BLOCK_SIZE, mode):
+    #determine if the image is colored or not
+    is_colored = not len(result.shape) == 2
     image = np.zeros_like(result, dtype=np.float32)
 
     # Parcours des blocs de 8x8

@@ -8,10 +8,8 @@ psnr_result = []
 new_images = []
 
 # Load of the TIFF image
-image = cv2.imread("src/data/bird.tif", cv2.IMREAD_UNCHANGED)
+image = cv2.imread("src/data/lena3.tif", cv2.IMREAD_UNCHANGED)
 
-#determine if the image is colored or not
-is_colored = not len(image.shape) == 2
 
 # Conversion to np.float32 to avoid loss of precision
 image_float32 = image.astype(np.float32)
@@ -19,10 +17,10 @@ image_float32 = image.astype(np.float32)
 # Loop on different quantization matrix
 for i in range(3):
     # Apply of the DCT and the quantization by block.
-    encoded_image = utils.encode(image_float32, BLOCK_SIZE, is_colored, i)
+    encoded_image = utils.encode(image_float32, BLOCK_SIZE, i)
 
     # Save of the coded image
-    cv2.imwrite("result/ex1/encoded_bird_mode"+str(i)+".tif", encoded_image.astype(np.float32))
+    cv2.imwrite("result/ex1/encoded_lena3_mode"+str(i)+".tif", encoded_image.astype(np.float32))
 
 
     #######################Separate Encodeur and Decodeur###############################
@@ -35,13 +33,13 @@ for i in range(3):
 
 
     # Apply of the dequantization and the IDCT by block.
-    reconstructed_image = utils.decode(encoded_image, BLOCK_SIZE, is_colored, i)
+    reconstructed_image = utils.decode(encoded_image, BLOCK_SIZE, i)
 
     # Final conversion to uint8 for display and save
     reconstructed_image_uint8 = reconstructed_image.astype(np.uint8)
 
     # Save of the decoded image
-    cv2.imwrite("result/decoded_bird_mode"+str(i)+".tif", reconstructed_image_uint8)
+    cv2.imwrite("result/decoded_lena3_mode"+str(i)+".tif", reconstructed_image_uint8)
     new_images.append(reconstructed_image_uint8)
 
     # PSNR calculation between original and decompressed image
