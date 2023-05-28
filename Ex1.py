@@ -8,7 +8,7 @@ psnr_result = []
 new_images = []
 
 # Load of the TIFF image
-image = cv2.imread("src/data/lena3.tif", cv2.IMREAD_UNCHANGED)
+image = cv2.imread("data/ex1/bird.tif", cv2.IMREAD_UNCHANGED)
 
 
 # Conversion to np.float32 to avoid loss of precision
@@ -20,7 +20,7 @@ for i in range(3):
     encoded_image = utils.encode(image_float32, BLOCK_SIZE, i)
 
     # Save of the coded image
-    cv2.imwrite("result/ex1/encoded_lena3_mode"+str(i)+".tif", encoded_image.astype(np.float32))
+    cv2.imwrite("result/ex1/encoded_bird_mode"+str(i)+".tif", encoded_image.astype(np.float32))
 
 
     #######################Separate Encodeur and Decodeur###############################
@@ -39,7 +39,7 @@ for i in range(3):
     reconstructed_image_uint8 = reconstructed_image.astype(np.uint8)
 
     # Save of the decoded image
-    cv2.imwrite("result/decoded_lena3_mode"+str(i)+".tif", reconstructed_image_uint8)
+    cv2.imwrite("result/ex1/decoded_bird_mode"+str(i)+".tif", reconstructed_image_uint8)
     new_images.append(reconstructed_image_uint8)
 
     # PSNR calculation between original and decompressed image
