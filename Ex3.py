@@ -1,145 +1,109 @@
 import cv2
 import numpy as np
+import utils
 
 BLOCK_SIZE = 8
-
-QUANTIZATION_MATRIX = np.array([[16, 11, 10, 16, 24, 40, 51, 61],
-                               [12, 12, 14, 19, 26, 58, 60, 55],
-                               [14, 13, 16, 24, 40, 57, 69, 56],
-                               [14, 17, 22, 29, 51, 87, 80, 62],
-                               [18, 22, 37, 56, 68, 109, 103, 77],
-                               [24, 35, 55, 64, 81, 104, 113, 92],
-                               [49, 64, 78, 87, 103, 121, 120, 101],
-                               [72, 92, 95, 98, 112, 100, 103, 99]])
-
-HIGH_QUANTIZATION_MATRIX = np.array([[32, 24, 22, 32, 48, 80, 102, 122],
-                                     [24, 24, 28, 38, 52, 116, 120, 110],
-                                     [28, 26, 32, 48, 80, 114, 138, 112],
-                                     [28, 34, 44, 58, 102, 174, 160, 124],
-                                     [36, 44, 74, 112, 136, 218, 206, 154],
-                                     [48, 70, 110, 128, 162, 208, 226, 184],
-                                     [98, 128, 156, 174, 206, 242, 240, 202],
-                                     [144, 184, 190, 196, 224, 200, 206, 198]])
-
-LOW_QUANTIZATION_MATRIX = np.array([[8, 5, 5, 8, 12, 20, 26, 31],
-                                    [6, 6, 7, 10, 13, 29, 30, 27],
-                                    [7, 6, 8, 12, 20, 29, 35, 28],
-                                    [7, 9, 11, 15, 26, 44, 40, 31],
-                                    [9, 11, 19, 28, 34, 55, 52, 39],
-                                    [12, 18, 28, 33, 41, 52, 57, 46],
-                                    [25, 32, 39, 43, 51, 60, 59, 50],
-                                    [36, 46, 48, 50, 57, 50, 52, 50]])
-
-FRAME_INTERVAL = 10
+SEQUENTIAL = True
+FRAME_INTERVAL = 2
 current_frame = 0
 previous_frame = None
+previous_I_frame = None
 
-# Fonction pour appliquer la DCT par bloc de 8x8
-def encode(image, is_i_frame):
-    result = np.zeros_like(image, dtype=np.float32)
+previous_coded_I_frame = None
 
-    # Parcours des blocs de 8x8
-    for i in range(0, image.shape[0], BLOCK_SIZE):
-        for j in range(0, image.shape[1], BLOCK_SIZE):
-            # Extraction du bloc de 8x8
-            block = image[i:i+BLOCK_SIZE, j:j+BLOCK_SIZE, :]
+# Open the video file
+video = cv2.VideoCapture("data/ex2/bus_cif.y4m")
 
-            # Application de la DCT sur chaque canal de couleur
-            dct_block = np.zeros_like(block, dtype=np.float32)
-            for k in range(block.shape[2]):
-                dct_block[:, :, k] = cv2.dct(block[:, :, k].astype(np.float32))
-                if is_i_frame:
-                    dct_block[:, :, k] = np.round(dct_block[:, :, k] / LOW_QUANTIZATION_MATRIX) * LOW_QUANTIZATION_MATRIX
-                else:
-                    dct_block[:, :, k] = np.round(dct_block[:, :, k] / LOW_QUANTIZATION_MATRIX) * LOW_QUANTIZATION_MATRIX
-
-            # Stockage du résultat
-            result[i:i+BLOCK_SIZE, j:j+BLOCK_SIZE, :] = dct_block
-    return result
-
-# Fonction pour appliquer l'IDCT par bloc de 8x8
-def decode(result):
-    image = np.zeros_like(result, dtype=np.float32)
-    previous_frame = np.zeros_like(result, dtype=np.float32)
-
-    # Parcours des blocs de 8x8
-    for i in range(0, result.shape[0], BLOCK_SIZE):
-        for j in range(0, result.shape[1], BLOCK_SIZE):
-            # Extraction du bloc de 8x8
-            dct_block = result[i:i+BLOCK_SIZE, j:j+BLOCK_SIZE, :]
-
-            # Application de l'IDCT sur chaque canal de couleur
-            block = np.zeros_like(dct_block, dtype=np.float32)
-
-            for k in range(dct_block.shape[2]):
-                block[:, :, k] = dct_block[:, :, k] * LOW_QUANTIZATION_MATRIX
-                block[:, :, k] = cv2.idct(dct_block[:, :, k].astype(np.float32))
-
-            # Addition de la D-frame à la précédente frame
-            block += previous_frame[i:i+BLOCK_SIZE, j:j+BLOCK_SIZE, :]
-
-            # Conversion des valeurs de block en uint8
-            block = np.clip(block, 0, 255)
-
-            # Stockage du résultat
-            image[i:i+BLOCK_SIZE, j:j+BLOCK_SIZE, :] = block
-
-            # Mise à jour de la précédente frame
-            previous_frame[i:i+BLOCK_SIZE, j:j+BLOCK_SIZE, :] = block
-
-    return image
-
-
-# Ouvrir la vidéo en utilisant cv2.VideoCapture
-video = cv2.VideoCapture("data/bus_cif.y4m")
-
-# Obtenir les propriétés de la vidéo
+# Get the video properties
 frame_width = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
 frame_height = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
 fps = video.get(cv2.CAP_PROP_FPS)
 frame_count = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
 
-# Créer un objet pour écrire la vidéo décodée
-output_video = cv2.VideoWriter("ex3_decoded_video.avi", cv2.VideoWriter_fourcc(*"XVID"), fps, (frame_width, frame_height))
+original_frames = []
 
-# Lire les frames de la vidéo une par une
-while video.isOpened():
+psnr_result = []
+
+# List to stock the encoded frames (index 0 contains frames for LOW_QUANTIZATION_MATRIX, 1 for QUANTIZATION_MATRIx, 2 for HIGH_QUANTIZATION_MATRIX and 3 for BAD_QUANTIZATION_MATRIX)
+encoded_frames = [[],[],[],[]]
+
+
+showVideo = True
+# Read video frames one by one and encode it.
+for i in range(frame_count):
     ret, frame = video.read()
 
     if not ret:
-        print("Can't receive frame (stream end?). Exiting ...")
+        print("Error")
         break
+    original_frames.append(frame)
 
-    # Conversion en np.float64 pour éviter la perte de précision
+    # Conversion to np.float32 to avoid loss of precision
     frame_float32 = frame.astype(np.float32)
 
-    if current_frame % FRAME_INTERVAL == 0:
-        # I-frame
-        encoded_frame = encode(frame_float32, is_i_frame=True)
-        previous_frame = frame_float32
-    else:
-        # D-frame
-        encoded_frame = encode(frame_float32 - previous_frame, is_i_frame=False)
-        previous_frame = frame_float32
+    # Loop for the test on different QUANTIZATION_MATRIX
+    for k in range(4):
 
-    # Application de l'IDCT pour la reconstruction
-    reconstructed_frame = decode(encoded_frame)
+        if current_frame % FRAME_INTERVAL == 0:
+            # I-frame
+            encoded_frame = utils.encode(frame_float32, BLOCK_SIZE, k)
+            encoded_frames[k].append(encoded_frame)
+            previous_frame = frame_float32
+            previous_I_frame = frame_float32
+        else:
+            # D-frame
+            encoded_frame = utils.encode(cv2.subtract(frame_float32, previous_I_frame), BLOCK_SIZE, k)
+            encoded_frames[k].append(encoded_frame)
+            previous_frame = frame_float32
 
-    # Conversion finale en uint8 pour l'enregistrement
-    reconstructed_frame_uint8 = reconstructed_frame.astype(np.uint8)
-
-    # Écrire le frame décodé dans la vidéo de sortie
-    output_video.write(reconstructed_frame_uint8)
-
-    # Affichage des images (facultatif)
-    cv2.imshow("Original Frame", frame)
-    cv2.imshow("Reconstructed Frame", reconstructed_frame_uint8)
+    # View original video
+    if showVideo :
+        cv2.imshow("Original Frame", frame)
     if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
-
+        showVideo=False
+        cv2.destroyWindow("Original Frame")
     current_frame += 1
 
-# Libérer les ressources
+if showVideo : 
+    # Close original video window
+    cv2.destroyWindow("Original Frame")
+
+for i in range(4):
+    # Create an object to write the decoded video
+    output_video = cv2.VideoWriter("result/ex3/decoded_bus_cif_mode"+str(i)+".avi", cv2.VideoWriter_fourcc(*"XVID"), fps, (frame_width, frame_height))
+
+    psnr = 0
+    # Browse encoded frames for decompression and display
+    for j, encoded_frame in enumerate(encoded_frames[i]):
+        
+        
+        if j % FRAME_INTERVAL == 0:
+            previous_coded_I_frame = encoded_frame
+
+        else:
+            encoded_frame = cv2.add(previous_coded_I_frame, encoded_frame)
+
+        # Apply dequantization and IDCT to get the decoded frame.
+        decoded_frame = utils.decode(encoded_frame, BLOCK_SIZE, i)
+
+        # Final conversion to uint8 for registration
+        decoded_frame_uint8 = decoded_frame.astype(np.uint8)
+
+        psnr+=cv2.PSNR(original_frames[j], decoded_frame_uint8)
+
+        # Write decoded frame to output video
+        output_video.write(decoded_frame_uint8)
+
+        # Display decoded frame
+        cv2.imshow("Reconstructed Frame mode"+str(i), decoded_frame_uint8)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+    psnr_result.append(psnr/frame_count)
+
+    output_video.release()
+print(psnr_result)
+utils.plot_psnr_result(psnr_result, "bus_cif")
+# Freeing up resources
 video.release()
-output_video.release()
 cv2.destroyAllWindows()
+
